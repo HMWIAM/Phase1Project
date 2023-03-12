@@ -434,6 +434,29 @@ cbar.ax.set_ylabel('ROI')
 plt.legend()
 plt.show()
 ```
+## How well do genres perfrom at the box office?
+We can answer this by plotting a bar graph as follows.  
+```python
+# I'll create a bar graph to show the success of a rating
+fig = plt.figure(figsize=(10, 6))
+
+# calculate the mean gross for each genre
+mean_gross_by_genre = rt_mov.groupby('genre')['box_office'].mean()
+
+# get the top 10 genres by mean box office revenue
+top_10_genres = mean_gross_by_genre.nlargest(10)
+
+# create a bar plot for the top 10 genres
+top_10_genres.plot(kind='bar')
+plt.xlabel('Genre')
+plt.ylabel('Box office revenue')
+plt.title('Top 10 genres by mean box office revenue', fontsize=20)
+plt.xticks(rotation=90)
+plt.show()
+```
+This shoud make a bar graph showing the relationship between genres and box office revenue.  
+
+
 Know we can see that, from the plot the relationship between the gross, production budget and ROI.  
 ## Movie characterist analysis
 In order for a studio to generate the highest ROI possible, it is best to look into the characteristics of the most popular movies.  
