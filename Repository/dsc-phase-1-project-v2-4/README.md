@@ -36,7 +36,8 @@ import random
 ## DATA CLEANING
 To start, I need to clean the data provided in such a manner that proper analysis and manipulation can be done.
 #### Function that will be in use
-This function is designed to fill null values in a column with the mode of that column
+I have created function that will make data cleaning really fast.  
+This function is designed to fill null values in a column with the mode of that column.  
 ```python
 # This function is designed to fill null values in a column with the mode of that column
 def fun_mode_fill_null(df, column_name):
@@ -109,6 +110,272 @@ def fun_date_convert(df, column_name, dayname, monthname):
     df[monthname] = df[column_name].dt.month_name()
     return df
 ```
+We shall now load and clean the data provided
+### Cleaning the bom.movie_gross.csv
+We'll start by loading the data.  
+```python
+# Import data from bom.movie_gross in the zippedData folder
+bom = pd.read_csv('zippedData/bom.movie_gross.csv')
+bom
+```
+We'll then check for duplicates and null values and fill them.  
+This will be done as below
+```python
+# Check the missing values for the columns
+bom.isna().sum()
+
+# Now we shall check if there are any duplicate values in title as it is the unique column and drop any duplicates
+fun_duplicate_count(bom, 'title')
+fun_duplicates_drop(bom, 'title')
+
+# Fill the null values in the domestic and foreign gross with the median values
+fun_median_fill_null(bom, 'domestic_gross')
+fun_median_fill_null(bom, 'foreign_gross')
+fun_mode_fill_null(bom, 'studio')
+
+# Create a new column worldwide gross by adding the domestic and foreign gross and filling the  ull values with the median
+bom['worldwide_gross'] = bom['domestic_gross'] + bom['foreign_gross']
+fun_median_fill_null(bom, 'foreign_gross')
+
+# Check if there is any remaining missing values in the bom
+bom.isna().sum()
+```
+We should no longer have any duplicates and missing values in BOM
+
+### Cleaning the tmdb.movies.csv
+We'll start by loading the data. 
+```python
+# Open and read the file
+tmdb = pd.read_csv('zippedData/tmdb.movies.csv')
+tmdb
+```
+We'll then check for duplicates and missing data, filling them if there are any.  
+```python
+# Check for null values
+tmdb.isna().sum()
+# There are no null values so we shall not be filling null values
+
+# We shall then drop duplicates using the unique id column as there should only be 1 unique id
+fun_duplicate_count(tmdb, 'id')
+fun_duplicates_drop(tmdb, 'id')
+
+# We shall now drop columns that are not comprehensible
+fun_column_drop(tmdb, 'genre_ids')
+fun_column_drop(tmdb, 'id')
+fun_column_drop(tmdb, 'Unnamed: 0')
+
+# We will now create 2 new column called Release day and Release month that will be used later in analysis stage
+fun_date_convert(tmdb, 'release_date', 'Release Day', 'Release Month')
+```
+We have now cleaned tmdb.  
+
+### Cleaning the im.db
+We'll start by loading the data
+```python
+# Opening the file
+conn = sqlite3.connect('zippedData/im.db')
+```
+There are multiple tables in this documents so we shall open and clean then.  
+#### Cleaning mov_rat
+```python
+# Inspecting the movie ratings tables
+mov_rat = pd.read_sql("""
+SELECT *
+  FROM movie_ratings;
+""", conn)
+mov_rat
+
+# Checking if there are missing vales
+mov_rat.isna().sum()
+#There are no missing values
+
+# We shall then drop duplicates using the unique movie_id column as there should only be 1 unique id
+fun_duplicate_count(mov_rat, 'movie_id')
+fun_duplicates_drop(mov_rat, 'movie_id')
+```
+#### Cleaning mov_rat
+```python
+# Inspecting the movie basics tables
+mov_bas = pd.read_sql("""
+SELECT *
+  FROM movie_basics;
+""", conn)
+mov_bas
+
+# Checking if there are missing vales
+mov_bas.isna().sum()
+
+# We shall start with replacing missing values in original title with those from primary title
+fun_replace_colvalues(mov_bas, 'original_title', 'primary_title')
+
+# We shall the replace missing vales from runtime with their median and genres with the mode
+fun_median_fill_null(mov_bas, 'runtime_minutes')
+fun_mode_fill_null(mov_bas, 'genres')
+
+# We shall check and remove duplicate using the movie_id unique identifier
+fun_duplicate_count(mov_bas, 'movie_id')
+fun_duplicates_drop(mov_bas, 'movie_id')
+
+# Check if there are any missing values left
+mov_bas.isna().sum()
+```
+#### Cleaning mov_akas
+```python
+# Opening and inspecting the movie akas
+mov_akas = pd.read_sql("""
+SELECT *
+  FROM movie_akas;
+""", conn)
+mov_akas
+
+# Checking for missing values
+mov_akas.isna().sum()
+
+#There are alot of missing languages  at 87% so we will drop the column
+fun_column_drop(mov_akas, 'language')
+#There are alot of missing types  at 50% so we shall drop this column too
+fun_column_drop(mov_akas, 'types')
+#There are alot of missing attributes  at 95% so we shall drop this column too
+fun_column_drop(mov_akas, 'attributes')
+mov_akas.isna().sum()
+
+# We will fill the missing regions with the mode
+fun_mode_fill_null(mov_akas, 'region')
+fun_replace_colvalues(mov_akas, 'is_original_title', 'title')
+mov_akas.isna().sum()
+```
+#### Cleaning mov_princi
+```python
+# Opening and inspecting movie principals
+mov_princi = pd.read_sql("""
+SELECT *
+  FROM principals;
+""", conn)
+mov_princi
+
+# Checking for missing values
+mov_princi.isna().sum()
+
+fun_column_drop(mov_princi, 'job') #There are 82% missing values
+fun_column_drop(mov_princi, 'characters') #There are 62% missing values
+mov_princi.isna().sum()
+
+# We shall not be removing duplicates as there seems people can appear more than once for the same movie
+```
+
+#### Cleaning mov_pers
+```python
+# Opening and inspecting movie persons
+mov_pers = pd.read_sql("""
+SELECT *
+  FROM persons;
+""", conn)
+mov_pers
+
+# Checking for missing values
+mov_pers.isna().sum()
+
+# The birth and death column have many missing values so we shall drop them
+fun_column_drop(mov_pers, 'birth_year')
+fun_column_drop(mov_pers, 'death_year')
+
+# We shall fill the primary profession column with the mode
+fun_mode_fill_null(mov_pers, 'primary_profession')
+mov_pers.isna().sum()
+
+# There should only be 1 person id in this table so we shall remove duplicates
+fun_duplicate_count(mov_pers, 'person_id')
+fun_duplicates_drop(mov_pers, 'person_id')
+```
+#### Cleaning the rt.movie_info.tsv
+```python
+# Opening and inspecting rt movies information
+rt_mov = pd.read_csv('zippedData/rt.movie_info.tsv', sep='\t')
+rt_mov
+
+# Checking for missing values
+rt_mov.isna().sum()
+
+# There are 68% missing values in studio so we shall drop it
+fun_column_drop(rt_mov, 'studio')
+
+# Filling in null in currency with mode
+fun_mode_fill_null(rt_mov, 'currency')
+
+# We shall create new column to see the days and months of release for movies
+fun_date_convert(rt_mov, 'theater_date', 'Theater Day', 'Theater Month')
+fun_date_convert(rt_mov, 'dvd_date', 'DVD Day', 'DVD Month')
+
+#Making runtime and box office cleanable
+rt_mov['runtime'] = rt_mov['runtime'].str.replace(' minutes', '').astype(float)
+rt_mov['box_office'] = rt_mov['box_office'].str.replace(',', '').astype(float)
+
+# nan appear to be registered as an director name. We shall replace it showing as a missing value
+rt_mov['director'] = rt_mov['director'].replace('nan', np.nan)
+rt_mov['writer'] = rt_mov['writer'].replace(np.nan)
+
+#Filling in all the null values
+fun_mode_fill_null(rt_mov, 'rating')
+fun_mode_fill_null(rt_mov, 'genre')
+fun_mode_fill_null(rt_mov, 'director')
+fun_mode_fill_null(rt_mov, 'writer')
+fun_median_fill_null(rt_mov, 'runtime')
+fun_median_fill_null(rt_mov, 'box_office')
+fun_mode_fill_null(rt_mov, 'theater_date')
+fun_mode_fill_null(rt_mov, 'dvd_date')
+fun_mode_fill_null(rt_mov, 'Theater Day')
+fun_mode_fill_null(rt_mov, 'Theater Month')
+fun_mode_fill_null(rt_mov, 'DVD Day')
+fun_mode_fill_null(rt_mov, 'DVD Month')
+rt_mov.isna().sum()
+# We shall leave the null values in synopsis as it's not possible to replicate unique sentences
+```
+##### Cleaning the rt.reviews.tsv
+```python
+# Opening and inspecting rt reviews
+rt_rev = pd.read_csv('zippedData/rt.reviews.tsv', encoding = 'latin-1', sep='\t')
+rt_rev
+
+# Checking for missing values
+rt_rev.isna().sum()
+
+# Adding day and month columns
+fun_date_convert(rt_rev, 'date', 'Day', 'Month')
+
+#This column is filled with both letter and number making it difficult to analyse so we shall drop it and use fresh columns as an alternative
+fun_column_drop(rt_rev, 'rating')
+
+# We shall fill the null values of publishers and critics with the mode
+fun_mode_fill_null(rt_rev, 'publisher')
+rt_rev.isna().sum()
+# We shall not replace the reviews or critics as they have as they are unique to each other
+
+# We shall not remove duplicates as critics appear more than once reviewing different movies
+```
+#### Cleaning the tn.movie_budgets.csv
+```python
+# Opening and inspecting tn.movie_budgets.csv
+tn = pd.read_csv('zippedData/tn.movie_budgets.csv', encoding = 'latin-1')
+tn
+
+# Checking for null values
+tn.isna().sum()
+
+# Removing duplicates using unique identifier id
+fun_duplicate_count(tn, 'id')
+fun_duplicates_drop(tn, 'id')
+
+# Creating a new column for Release days and months
+fun_date_convert(tn, 'release_date', 'Release Day', 'Release Month')
+# Checking for null values
+tn.isna().sum()
+# Creating a new column foreign gross assuming worldwide gross contains both domestic andforeign gross
+tn['production_budget'] = [float(x.replace('$', '').replace(',', '')) for x in tn['production_budget'] ]
+tn['domestic_gross'] = [float(x.replace('$', '').replace(',', '')) for x in tn['domestic_gross'] ]
+tn['worldwide_gross'] = [float(x.replace('$', '').replace(',', '')) for x in tn['worldwide_gross'] ]
+tn['foreign_gross'] = tn['worldwide_gross'] - tn['domestic_gross']
+```
+We are now done with Data Cleaning
 
 # EXPLORATORY DATA ANALYSIS
 In this section, we shall analyse the cleaned data and visualize them in a manner than is understandable.
@@ -310,7 +577,7 @@ plt.show()
 ```
 We can now see how many staff member we need per movie.
 
-# Does director or writer choice affect revenue?
+### Does director or writer choice affect revenue?
 To answer this, we will need to create to bar charts that show how much directors and writer attract at the box office.
 ```python
 # group by director and sum the revenue
